@@ -257,6 +257,53 @@ fn export_to_pdf(jobs: &[Job], output_path: &str) -> Result<(), Box<dyn std::err
         y -= line_height;
     }
 
+    // --- Statistics Table ---
+    y -= 10.0; // Space before stats
+
+    // Calculate stats
+    let total_jobs = jobs.len();
+    let pending_count = jobs.iter().filter(|j| j.final_answer.is_none()).count();
+    let mut status_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    
+    for job in jobs {
+        if let Some(ans) = &job.final_answer {
+            *status_counts.entry(ans.clone()).or_insert(0) += 1;
+        }
+    }
+
+    // Check space for stats header + at least a few rows
+    if y < 40.0 {
+        let (page, layer) = doc.add_page(Mm(297.0), Mm(210.0), "Layer 1");
+        current_layer = doc.get_page(page).get_layer(layer);
+        y = 190.0;
+    }
+
+    // Draw Stats Header
+    current_layer.use_text("Statistics", 14.0, Mm(10.0), Mm(y), &font);
+    y -= 8.0;
+
+    // Draw Total
+    current_layer.use_text("Total Applications", 12.0, Mm(10.0), Mm(y), &font);
+    current_layer.use_text(total_jobs.to_string(), 12.0, Mm(60.0), Mm(y), &font);
+    y -= line_height;
+
+    // Draw Pending
+    current_layer.use_text("Pending", 12.0, Mm(10.0), Mm(y), &font);
+    current_layer.use_text(pending_count.to_string(), 12.0, Mm(60.0), Mm(y), &font);
+    y -= line_height;
+
+    // Draw other statuses
+    for (status, count) in status_counts {
+        if y < 20.0 {
+            let (page, layer) = doc.add_page(Mm(297.0), Mm(210.0), "Layer 1");
+            current_layer = doc.get_page(page).get_layer(layer);
+            y = 190.0;
+        }
+        current_layer.use_text(status, 12.0, Mm(10.0), Mm(y), &font);
+        current_layer.use_text(count.to_string(), 12.0, Mm(60.0), Mm(y), &font);
+        y -= line_height;
+    }
+
     doc.save(&mut std::io::BufWriter::new(File::create(output_path)?))?;
     Ok(())
 }
